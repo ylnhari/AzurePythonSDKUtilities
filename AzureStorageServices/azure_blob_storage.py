@@ -15,6 +15,7 @@ BlobClient: The BlobClient class allows you to manipulate Azure Storage blobs.
 """
 from azure.identity import InteractiveBrowserCredential, DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.core.exceptions import ResourceExistsError
 from typing import Union, Type
 
 def get_azure_credential(type: str ='default') -> Type['Azure Identity Credential']:
@@ -62,7 +63,7 @@ def get_container_Service_client(blob_service_client, BLOB_STORAGE_CONTAINER_NAM
     container_client = blob_service_client.get_container_client(container=BLOB_STORAGE_CONTAINER_NAME)
     return container_client
                                                                           
-def get_container_Service_client(container_client, blob_file_name: str) -> Type['BlobClient object']:
+def get_blob_client(container_client, blob_file_name: str) -> Type['BlobClient object']:
     """Get the BlobClient class that allows you to manipulate Azure Storage blobs..
 
     Attributes
@@ -87,7 +88,32 @@ def get_container_Service_client(container_client, blob_file_name: str) -> Type[
     blob_client = container_client.get_blob_client(blob_file_name)
     
     return blob_client
-                                                                           
+                                                                          
+def upload_file_to_blob():
+    """Upload a File to Blob storage container using V2 Python SDK."""
+    def show_file_progress(uploaded_size: Union[int, float], total_size: Union[int, float]):
+        """Print Progress while uploading large Files."""
+        bar_total_length = 20
+        percentage_uploaded = int((uploaded_size*100) / total_size)
+        current_bar_length = int(percentage_uploaded * bar_total_length / 100)
+        progress_bar = '|' + '#'*current_bar_length + '|' + str(percentage_uploaded) + '% Completed' 
+        print('\r' + progress_bar, end='', flush=True)
+                                                                          
+    interactive_credential = get_azure_credential('interactive')   # InteractiveBrowserCredential()                                                                  
+    blob_service_client = get_blob_Service_client('STORAGE_ACCOUNT_URL', interactive_credential) # BlobServiceClient(STORAGE_ACCOUNT_URL, credential=interactive_credential))
+    container_client = get_container_Service_client(blob_service_client, 'BLOB_STORAGE_CONTAINER_NAME') #  blob_service_client.get_container_client(container='BLOB_STORAGE_CONTAINER_NAME')
+    file_name_with_folder_structure_on_blob = '{}/{}/{}'.format('parent_folder', 'child_folder', 'file_name.csv')
+    file_path_to_read = "./filename.csv"                                                                                                                    
+    try:
+        # create so-called folder
+        blob_client = get_blob_client(container_client, blob_file_name=file_name_with_folder_structure_on_blob)  # container_client.get_blob_client(blob_file_name)
+        # upload blob/file
+        with open (file_path_to_read, 'rb') as data:
+            blob_client.upload_blob(data, progress_hook=show_file_progress)
+    except ResourceExistsError as Error: # from azure.core.exceptions import ResourceExistsError
+           print(f"you are trying to upload an existing file in the blob")
+           break
+                                                                          
 def list_blobs_in_the_container(container_client, print_list: bool=True) -> list:
     """Get all the blob files in the container.Print the list if required
     
@@ -125,4 +151,4 @@ def delete_all_blobs_that_matching_string_in_their_name(container_client, matchi
         blob_list = list_blobs_in_the_container(container_client, print_list=False)
         list_to_delete = [i for i in blob_list if name in i]
         for file_to_delete in list_to_delete:
-            delete_blob_file(container_client, file_to_delete)
+            delete_blob_file(container_client, file_to_delete)                                                             
