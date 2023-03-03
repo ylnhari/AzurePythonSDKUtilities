@@ -13,10 +13,15 @@ BlobServiceClient: The BlobServiceClient class allows you to manipulate Azure St
 ContainerClient: The ContainerClient class allows you to manipulate Azure Storage containers and their blobs.
 BlobClient: The BlobClient class allows you to manipulate Azure Storage blobs.
 """
+#import azure python sdk packages
 from azure.identity import InteractiveBrowserCredential, DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from azure.core.exceptions import ResourceExistsError
+
+# import other packages
 from typing import Union, Type
+from io import StringIO
+import pandas as pd
 
 def get_azure_credential(type: str ='default') -> Type['Azure Identity Credential']:
   """We need to Authenticate to Azure and authorize access to blob data to perform operations
@@ -151,4 +156,44 @@ def delete_all_blobs_that_matching_string_in_their_name(container_client, matchi
         blob_list = list_blobs_in_the_container(container_client, print_list=False)
         list_to_delete = [i for i in blob_list if name in i]
         for file_to_delete in list_to_delete:
-            delete_blob_file(container_client, file_to_delete)                                                             
+            delete_blob_file(container_client, file_to_delete)
+
+                                                                          
+def read_csv_from_blob_container(container_client: ContainerClient, file_name: str) -> Union[pd.DataFrame, bool]:
+    """
+    This function reads CSV file located in the azure blob 
+    storage container and loads it into a pandas DataFrame.
+    
+    Parameters
+    ----------
+        container_client : ContainerClient Object to perform operations on the connected
+                           Azure Blob container.
+        file_name :  name of the blob file to read.
+    Returns
+    -------
+        Csv file loaded into a pandas dataframe or False if blob file not present.
+        
+    Example
+    -------
+      if you have a file 'sample.csv' , inside your blob storage container - 'sample-container',
+      and this conatiner is present in a storage account 'sample-storage-account' with 
+      url - 'sample-storage-account-url' then to read the file
+      
+      interactive_credential = get_azure_credential('interactive')   # InteractiveBrowserCredential()                                                                  
+      blob_service_client = get_blob_Service_client('sample-storage-account-url', interactive_credential) # BlobServiceClient(sample-storage-account-url, credential=interactive_credential))
+      container_client = get_container_Service_client(blob_service_client, 'sample-container') #  blob_service_client.get_container_client(container=sample-container')
+      # Note:- if you have a folder/directory structure inside you blob container (which are not actually folders/directories ->  those simply part of you file name)
+      file_name_with_folder_structure_on_blob = f'parent_folder/child_folder/sample.csv'
+      df  = read_csv_from_blob_container(ContainerClient, file_name_with_folder_structure_on_blob)
+      
+      # Similarly you can adapt this code to any kind of file
+      
+    """
+    blob_client = container_client.get_blob_client(file_name) # get blob client to perform operations on individual blob files
+    if blob_client.exists(): # if a blob file exists
+        download_stream = blob_client.download_blob() # get the blob content as a stream object
+        df = pd.read_csv(StringIO(download_stream.content_as_text())) # extract text from the blob stream object and send it as input to pd.read_csv method
+        print(f"Shape of the file {file_name} is {df.shape}.")
+        return df
+    else:
+        return False
